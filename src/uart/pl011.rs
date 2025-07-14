@@ -1,4 +1,4 @@
-use core::{ptr::NonNull, task::Waker};
+use core::ptr::NonNull;
 use futures::task::AtomicWaker;
 use tock_registers::{
     interfaces::{Readable, Writeable},

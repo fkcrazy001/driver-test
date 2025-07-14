@@ -26,7 +26,10 @@ impl<T> Mutex<T> {
         self.inner
             .store(false, core::sync::atomic::Ordering::Release);
     }
-    /// get inner on s
+    /// # Safety
+    ///
+    ///  only call this function in irq `
+    #[allow(clippy::mut_from_ref)]
     pub unsafe fn force_use(&self) -> &mut T {
         unsafe { &mut *self.data.get() }
     }
