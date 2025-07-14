@@ -8,12 +8,16 @@ extern crate bare_test;
 #[bare_test::tests]
 mod tests {
     use bare_test::{
+        GetIrqConfig,
         globals::{PlatformInfoKind, global_val},
+        irq::{IrqInfo, IrqParam},
         mem::iomap,
         println,
     };
     use log::info;
-    use my_driver::uart::pl011::PhytiumUart;
+    use my_driver::{mutex::Mutex, uart::pl011::PhytiumUart};
+
+    static PL011: Mutex<Option<PhytiumUart>> = Mutex::new(None);
 
     #[test]
     fn it_works() {
@@ -28,21 +32,40 @@ mod tests {
         // uart1 send actual write value on screen
         let PlatformInfoKind::DeviceTree(fdt) = &global_val().platform_info;
         let dbt = fdt.get();
-        let uart_regs = dbt
-            .find_compatible(&["arm,pl011"])
-            .next()
-            .unwrap()
-            .reg()
-            .unwrap()
-            .next()
-            .unwrap();
+        let node = dbt.find_compatible(&["arm,pl011"]).next().unwrap();
+        let uart_regs = node.reg().unwrap().next().unwrap();
+        let irq_info = node.irq_info().unwrap();
+        let cfg = irq_info.cfgs[0].clone();
+        println!("irq info {irq_info:?}");
         let base = uart_regs.address;
 
         let mut mmio = iomap((base as usize).into(), uart_regs.size.unwrap());
-        let mut uart = PhytiumUart::new(unsafe { mmio.as_mut() });
-        let message = ['p', 'h', 'y', 't', 'i', 'u', 'm', '!', '!', '\r', '\n'];
-        for c in message {
-            uart.put_byte_poll(c as u8);
+
+        let uart = PhytiumUart::new(unsafe { mmio.as_mut() });
+        {
+            let mut ug = PL011.lock();
+            *ug = Some(uart);
         }
+
+        spin_on::spin_on(async {
+            let mut ug = PL011.lock();
+            let uart = ug.as_mut().unwrap();
+            uart.init_irq(100_000_000, 115200);
+            // register rx中断号
+            IrqParam {
+                intc: irq_info.irq_parent,
+                cfg,
+            }
+            .register_builder(|_| {
+                unsafe {
+                    PL011.force_use().as_mut().unwrap().handle_interrupt();
+                }
+                bare_test::irq::IrqHandleResult::Handled
+            })
+            .register();
+            let message = b"hello,phytium\r\n";
+            uart.write_bytes(message).await;
+            println!("uart = {:?}", uart);
+        });
     }
 }

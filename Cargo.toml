@@ -4,10 +4,12 @@ name = "my_driver"
 version = "0.1.0"
 
 [dependencies]
+futures = { version = "0.3.31", features = ["alloc"], default-features = false }
 mbarrier = "0.1"
 dma-api = { version = "0.3", features = ["alloc"] }
 log = "0.4"
 tock-registers = "0.10.0"
+spin_on = "0.1.1"
 
 [dev-dependencies]
 bare-test = "0.4"
