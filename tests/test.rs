@@ -13,7 +13,7 @@ mod tests {
         println,
     };
     use log::info;
-    use pl011::PhytiumUart;
+    use my_driver::uart::pl011::PhytiumUart;
 
     #[test]
     fn it_works() {
