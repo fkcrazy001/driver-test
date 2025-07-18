@@ -7,9 +7,12 @@ version = "0.1.0"
 mbarrier = "0.1"
 dma-api = { version = "0.3", features = ["alloc"] }
 log = "0.4"
+tock-registers = "0.10.0"
+trait-ffi = "0.1.2"
 
 [dev-dependencies]
 bare-test = "0.4"
+pcie = "0.3"
 
 [build-dependencies]
 bare-test-macros = "0.2"
