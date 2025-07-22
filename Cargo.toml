@@ -1,6 +1,6 @@
 [package]
 edition = "2024"
-name = "project-name"
+name = "igb"
 version = "0.1.0"
 
 [dependencies]
@@ -13,6 +13,13 @@ trait-ffi = "0.1.2"
 [dev-dependencies]
 bare-test = "0.4"
 pcie = "0.3"
+smoltcp = { version = "0.12", default-features = false, features = [
+    "alloc",
+    "medium-ethernet",
+    "proto-ipv4",
+    "socket-icmp",
+] }
+
 
 [build-dependencies]
 bare-test-macros = "0.2"

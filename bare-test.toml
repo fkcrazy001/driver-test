@@ -2,4 +2,4 @@
 machine = "virt"
 cpu = "cortex-a53"
 graphic = false
-args = "-netdev user,id=net0 -device igb,netdev=net0"
+args = "-netdev user,id=net0,restrict=off -device igb,netdev=net0 -object filter-dump,id=f1,netdev=net0,file=vm_capture.pcap"

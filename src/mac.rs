@@ -1,8 +1,8 @@
-use core::{ptr::NonNull, time::Duration};
+use core::{fmt::Display, ptr::NonNull, time::Duration};
 
 use mbarrier::mb;
 use tock_registers::{
-    interfaces::{Readable, Writeable},
+    interfaces::{ReadWriteable, Readable, Writeable},
     register_bitfields, register_structs,
     registers::{ReadOnly, ReadWrite},
 };
@@ -21,7 +21,7 @@ register_structs! {
         (0x24 => _rsv4),
         (0x100 => pub rctl: ReadWrite<u32, RCTL::Register>),
         (0x104 => _rsv7),
-        (0x400 => tctl: ReadWrite<u32>),
+        (0x400 => tctl: ReadWrite<u32,TCTL::Register>),
         (0x404 => _rsv12),
         (0x01524 => eims: ReadWrite<u32>),
         (0x01528 => eimc: ReadWrite<u32>),
@@ -196,7 +196,24 @@ register_bitfields! [
             DoNotStrip = 0,
             Strip = 1,
         ],
-    ]
+    ],
+    // Transmit Control Register - TCTL (0x400)
+    TCTL [
+        EN OFFSET(1) NUMBITS(1)[
+            Disabled = 0,
+            Enabled = 1,
+        ],
+        PSP OFFSET(3) NUMBITS(1)[
+            Disabled = 0,
+            Enabled = 1,
+        ],
+        CT OFFSET(4) NUMBITS(8)[],
+        COLD OFFSET(12) NUMBITS(10)[],
+        SWXOFF OFFSET(22) NUMBITS(1)[],
+        RTLC OFFSET(24) NUMBITS(1)[],
+        NRTU OFFSET(25) NUMBITS(1)[],
+        MULR OFFSET(28) NUMBITS(1)[],
+    ],
 ];
 
 #[derive(Clone, Copy)]
@@ -213,6 +230,9 @@ impl Mac {
     }
     fn regs(&self) -> &MacRegister {
         unsafe { self.reg.as_ref() }
+    }
+    pub fn base_addr<T>(&self) -> NonNull<T> {
+        self.reg.cast()
     }
     pub fn disable_irq(&mut self) {
         self.regs_mut().eimc.set(u32::MAX);
@@ -234,7 +254,7 @@ impl Mac {
         .map_err(|_| ())
     }
     pub fn link_up(&mut self) {
-        self.regs_mut().ctrl.write(CTRL::SLU::SET);
+        self.regs_mut().ctrl.modify(CTRL::SLU::SET);
     }
     pub fn mdic_read(&mut self, phy_addr: u32, offset: u32) -> Result<u16, ()> {
         self.regs_mut().mdic.write(
@@ -291,12 +311,57 @@ impl Mac {
             phy_reset_asserted: status.is_set(STATUS::PHYRA),
         }
     }
+    pub fn enable_rx_tx(&mut self) {
+        self.regs().rctl.modify(RCTL::RXEN::SET);
+        self.regs().tctl.modify(TCTL::EN::Enabled);
+    }
+
+    pub fn mac_addr(&self) -> MacAddr {
+        let mac_l = self.regs().ralh_0_15[0].get();
+        let mac_h = self.regs().ralh_0_15[1].get();
+        ((mac_h as u64) << 32 | mac_l as u64).into()
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct MacStatus {
     pub speed: Speed,
     pub link_up: bool,
     pub full_duplex: bool,
     pub phy_reset_asserted: bool,
+}
+#[derive(Debug)]
+pub struct MacAddr([u8; 6]);
+
+impl Display for MacAddr {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5]
+        )
+    }
+}
+
+impl MacAddr {
+    pub fn new(bytes: [u8; 6]) -> Self {
+        MacAddr(bytes)
+    }
+
+    pub fn bytes(&self) -> [u8; 6] {
+        self.0
+    }
+}
+
+impl From<u64> for MacAddr {
+    fn from(value: u64) -> Self {
+        MacAddr([
+            (value & 0xff) as u8,
+            ((value >> 8) & 0xff) as u8,
+            (value >> 16) as u8,
+            (value >> 24) as u8,
+            (value >> 32) as u8,
+            (value >> 40) as u8,
+        ])
+    }
 }
