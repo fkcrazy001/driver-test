@@ -1,12 +1,15 @@
 [package]
 edition = "2024"
-name = "project-name"
+name = "usb-serial"
 version = "0.1.0"
 
 [dependencies]
 mbarrier = "0.1"
 dma-api = { version = "0.3", features = ["alloc"] }
 log = "0.4"
+crab-usb = "0.2.1"
+futures = {version = "0.3", features = ["alloc"], default-features = false}
+usb-if = "0.2.1"
 
 [dev-dependencies]
 bare-test = "0.4"

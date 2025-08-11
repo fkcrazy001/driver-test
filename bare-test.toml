@@ -2,4 +2,4 @@
 machine = "virt"
 cpu = "cortex-a53"
 graphic = false
-args = ""
+args = "-usb -d trace:*usb*,trace:*xhci* -device qemu-xhci,id=xhci -device usb-host,bus=xhci.0,hostbus=0,hostaddr=4"
