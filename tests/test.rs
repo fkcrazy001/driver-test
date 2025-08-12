@@ -7,7 +7,7 @@ extern crate bare_test;
 
 #[bare_test::tests]
 mod tests {
-    use alloc::{boxed::Box, vec::Vec};
+    use alloc::{boxed::Box, string::String, vec::Vec};
     use bare_test::{
         GetIrqConfig,
         async_std::time,
@@ -19,22 +19,57 @@ mod tests {
         println,
     };
     use core::{pin::Pin, time::Duration};
-    use crab_usb::*;
+    use crab_usb::{impl_trait, *};
     use futures::FutureExt;
     use log::*;
     use pcie::*;
 
     #[test]
     fn it_works() {
-        info!("This is a test log message.");
-        let a = 2;
-        let b = 2;
-        assert_eq!(a + b, 4);
-        println!("test passed!");
+        spin_on::spin_on(async {
+            debug!("start to get usb serial");
+            let info = get_usb_host();
+            let irq_info = info.irq.clone().unwrap();
+
+            let mut host = Box::pin(info.usb);
+
+            register_irq(irq_info, &mut host);
+            host.init().await.unwrap();
+            let mut sd = None;
+            for mut deinfo in host.device_list().await.unwrap() {
+                debug!("get device info {:#}", deinfo);
+                let device = deinfo.open().await.unwrap();
+                if let Some(serial) = usb_serial::Ch341::new(device) {
+                    sd = Some(serial)
+                }
+            }
+            let mut serial = sd.expect("serial device not found");
+            serial.init().await.unwrap();
+
+            loop {
+                let mut d = serial.recv().await.unwrap();
+                let s = unsafe { String::from_raw_parts(d.as_mut_ptr(), d.len(), d.len()) };
+                println!("{s}");
+            }
+        })
     }
     struct XhciInfo {
-        usb: USBHost<Xhci>,
+        usb: USBHost,
         irq: Option<IrqInfo>,
+    }
+
+    trait Align {
+        fn align_up(&self, align: usize) -> usize;
+    }
+
+    impl Align for usize {
+        fn align_up(&self, align: usize) -> usize {
+            if (*self).is_multiple_of(align) {
+                *self
+            } else {
+                *self + align - *self % align
+            }
+        }
     }
 
     fn get_usb_host() -> XhciInfo {
@@ -141,7 +176,7 @@ mod tests {
                     println!("irq: {irq:?}");
 
                     return XhciInfo {
-                        usb: USBHost::new(addr),
+                        usb: USBHost::new_xhci(addr),
                         irq,
                     };
                 }
@@ -162,7 +197,7 @@ mod tests {
                 let irq = node.irq_info();
 
                 return XhciInfo {
-                    usb: USBHost::new(addr),
+                    usb: USBHost::new_xhci(addr),
                     irq,
                 };
             }
@@ -171,8 +206,8 @@ mod tests {
         panic!("no xhci found");
     }
 
-    fn register_irq(irq: IrqInfo, host: &mut Pin<Box<USBHost<Xhci>>>) {
-        let ptr: *mut USBHost<Xhci> = host.as_mut().get_mut() as *mut _;
+    fn register_irq(irq: IrqInfo, host: &mut Pin<Box<USBHost>>) {
+        let ptr: *mut USBHost = host.as_mut().get_mut() as *mut _;
 
         for one in &irq.cfgs {
             IrqParam {
@@ -182,12 +217,24 @@ mod tests {
             .register_builder({
                 move |_irq| {
                     unsafe {
-                        (&mut *ptr).handle_irq();
+                        (&mut *ptr).event_handler();
                     }
                     IrqHandleResult::Handled
                 }
             })
             .register();
+        }
+    }
+
+    struct KernelImpl;
+    impl_trait! {
+        impl Kernel for KernelImpl {
+            fn sleep<'a>(duration: Duration) -> futures::future::BoxFuture<'a, ()> {
+                time::sleep(duration).boxed()
+            }
+            fn page_size() -> usize {
+                page_size()
+            }
         }
     }
 }
