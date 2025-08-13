@@ -35,6 +35,7 @@ mod tests {
 
             register_irq(irq_info, &mut host);
             host.init().await.unwrap();
+            debug!("host init done");
             let mut sd = None;
             for mut deinfo in host.device_list().await.unwrap() {
                 debug!("get device info {:#}", deinfo);

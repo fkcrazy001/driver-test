@@ -3,4 +3,6 @@ machine = "virt"
 cpu = "cortex-a53"
 graphic = false
 # args = "-usb -d trace:*usb*,trace:*xhci* -device qemu-xhci,id=xhci -device usb-host,bus=xhci.0,hostbus=0,hostaddr=4"
-args = "-usb -d trace:*usb*,trace:*xhci* -device qemu-xhci,id=xhci -device usb-host,bus=xhci.0,hostbus=0,hostaddr=4"
+# args = "-usb -d trace:*usb*,trace:*xhci* -device qemu-xhci,id=xhci -device usb-host,bus=xhci.0,hostbus=0,hostaddr=3"
+# args = "-usb -d trace:*usb*,trace:*xhci* -device qemu-xhci,id=xhci -device usb-host,bus=xhci.0,vendorid=0x0bda,productid=0x5856" #camera
+args = "-usb -d trace:*usb*,trace:*xhci* -device qemu-xhci,id=xhci -device usb-host,bus=xhci.0,vendorid=0x1a86,productid=0x7523" #serial
